@@ -7,8 +7,8 @@ import cookieParser from "cookie-parser";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import multer from "multer";
-import sharp from "sharp";
 import nodemailer from "nodemailer";
+import PDFDocument from "pdfkit";
 
 dotenv.config();
 
@@ -241,7 +241,7 @@ app.post("/api/v1/login", async (req, res) => {
   }
 });
 
-// File upload endpoint with multer and image processing with sharp
+// File upload endpoint with multer
 app.post("/api/v1/upload-image", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
@@ -253,11 +253,7 @@ app.post("/api/v1/upload-image", upload.single("image"), async (req, res) => {
 
     const { buffer, originalname, mimetype } = req.file;
 
-    // Process image with sharp (resize, optimize)
-    const processedImage = await sharp(buffer)
-      .resize(800, 600, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 80 })
-      .toBuffer();
+    // No image processing - just return file info
 
     // Generate unique filename with UUID
     const fileExtension = originalname.split(".").pop();
@@ -267,18 +263,12 @@ app.post("/api/v1/upload-image", upload.single("image"), async (req, res) => {
     // For demo, we'll just return the processed image info
     res.json({
       success: true,
-      message: "Image processed and uploaded successfully",
+      message: "Image uploaded successfully",
       fileInfo: {
         originalName: originalname,
         uniqueName: uniqueFilename,
         mimeType: mimetype,
-        originalSize: buffer.length,
-        processedSize: processedImage.length,
-        compressionRatio:
-          (
-            ((buffer.length - processedImage.length) / buffer.length) *
-            100
-          ).toFixed(2) + "%",
+        fileSize: buffer.length,
       },
     });
   } catch (error) {
@@ -435,6 +425,45 @@ app.post("/api/v1/logout", (req, res) => {
     success: true,
     message: "Logged out successfully",
   });
+});
+
+// PDF download endpoint using PDFKit
+app.get("/api/v1/download-hello-pdf", (req, res) => {
+  try {
+    // Create a new PDF document
+    const doc = new PDFDocument();
+
+    // Set response headers for PDF download
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", 'attachment; filename="hello.pdf"');
+
+    // Pipe the PDF to the response
+    doc.pipe(res);
+
+    // Add content to the PDF
+    doc.fontSize(24).text("Hello World!", 100, 100);
+
+    doc
+      .fontSize(16)
+      .text("This is a simple PDF generated using PDFKit.", 100, 150);
+
+    doc
+      .fontSize(12)
+      .text("Generated on: " + new Date().toLocaleString(), 100, 200);
+
+    // Add some styling
+    doc.rect(50, 50, 500, 200).stroke();
+
+    // Finalize the PDF
+    doc.end();
+  } catch (error) {
+    console.error("PDF generation error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate PDF",
+      error: error.message,
+    });
+  }
 });
 
 app.listen(PORT, () => {

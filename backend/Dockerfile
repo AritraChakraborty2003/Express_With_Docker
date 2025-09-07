@@ -1,24 +1,23 @@
-# Use the official Node.js runtime as the base image
-FROM node:18-alpine
+# Use Debian-based Node.js
+FROM node:18
 
-# Set the working directory in the container
+# Set working directory
 WORKDIR /app
 
-
-#Install pnpm globally
+# Install pnpm globally
 RUN npm install -g pnpm
 
-# Copy package.json and package-lock.json (if available)
-COPY package*.json pnpm-lock.yaml ./
+# Copy only dependency files first (better cache)
+COPY package.json pnpm-lock.yaml ./
 
-# Install dependencies
-RUN pnpm install --no-frozen-lockfile
+# Install dependencies inside the container
+RUN pnpm install --include=optional
 
-# Copy the rest of the application code
+# Copy rest of the app, but exclude node_modules
 COPY . .
 
-# Expose the port the app runs on
+# Expose port
 EXPOSE 4000
 
-# Define the command to run the application
+# Run app
 CMD ["pnpm", "start"]

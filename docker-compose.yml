@@ -9,6 +9,5 @@ services:
       - PORT=4000
     volumes:
       - ./backend:/app
-      - /app/node_modules
     restart: unless-stopped
     container_name: express-backend
