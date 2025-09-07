@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import axios from "axios";
+import { v4 as uuidv4 } from "uuid";
 
 dotenv.config();
 
@@ -92,6 +93,73 @@ app.post("/api/v1/create-post", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to create post",
+      error: error.message,
+    });
+  }
+});
+
+// UUID endpoint to generate unique identifiers
+app.get("/api/v1/generate-uuid", (req, res) => {
+  try {
+    const count = parseInt(req.query.count) || 1;
+    const uuids = [];
+
+    for (let i = 0; i < count; i++) {
+      uuids.push({
+        id: uuidv4(),
+        timestamp: new Date().toISOString(),
+        index: i + 1,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Generated ${count} UUID(s) successfully`,
+      data: uuids,
+      count: uuids.length,
+      generated_at: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("UUID generation error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate UUID",
+      error: error.message,
+    });
+  }
+});
+
+// UUID endpoint to create a user with unique ID
+app.post("/api/v1/create-user", (req, res) => {
+  try {
+    const { name, email, role } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).json({
+        success: false,
+        message: "Name and email are required",
+      });
+    }
+
+    const user = {
+      id: uuidv4(),
+      name,
+      email,
+      role: role || "user",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    res.status(201).json({
+      success: true,
+      message: "User created successfully with UUID",
+      data: user,
+    });
+  } catch (error) {
+    console.error("User creation error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to create user",
       error: error.message,
     });
   }
