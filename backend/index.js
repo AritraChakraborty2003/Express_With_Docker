@@ -9,6 +9,7 @@ import jwt from "jsonwebtoken";
 import multer from "multer";
 import nodemailer from "nodemailer";
 import PDFDocument from "pdfkit";
+import moment from "moment";
 
 dotenv.config();
 
@@ -461,6 +462,220 @@ app.get("/api/v1/download-hello-pdf", (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to generate PDF",
+      error: error.message,
+    });
+  }
+});
+
+// Date/Time manipulation endpoint using moment.js
+app.get("/api/v1/date-time", (req, res) => {
+  try {
+    const { format, timezone, operation } = req.query;
+
+    // Get current time
+    const now = moment();
+
+    // Default response with various date formats
+    const dateInfo = {
+      current: {
+        iso: now.toISOString(),
+        formatted: now.format("YYYY-MM-DD HH:mm:ss"),
+        unix: now.unix(),
+        human: now.fromNow(),
+        dayOfWeek: now.format("dddd"),
+        dayOfYear: now.dayOfYear(),
+        weekOfYear: now.week(),
+        quarter: now.quarter(),
+      },
+      formats: {
+        default: now.format(),
+        dateOnly: now.format("YYYY-MM-DD"),
+        timeOnly: now.format("HH:mm:ss"),
+        readable: now.format("MMMM Do YYYY, h:mm:ss a"),
+        short: now.format("MMM D, YYYY"),
+        long: now.format("dddd, MMMM Do YYYY, h:mm:ss a"),
+      },
+      calculations: {
+        startOfDay: now.clone().startOf("day").format(),
+        endOfDay: now.clone().endOf("day").format(),
+        startOfWeek: now.clone().startOf("week").format(),
+        endOfWeek: now.clone().endOf("week").format(),
+        startOfMonth: now.clone().startOf("month").format(),
+        endOfMonth: now.clone().endOf("month").format(),
+        startOfYear: now.clone().startOf("year").format(),
+        endOfYear: now.clone().endOf("year").format(),
+      },
+      timezone: {
+        utc: now.utc().format(),
+        local: now.local().format(),
+        offset: now.format("Z"),
+      },
+    };
+
+    // Handle custom format if provided
+    if (format) {
+      dateInfo.customFormat = now.format(format);
+    }
+
+    // Handle timezone conversion if provided
+    if (timezone) {
+      dateInfo.timezoneConversion = {
+        original: now.format(),
+        converted: now.tz(timezone).format(),
+        timezone: timezone,
+      };
+    }
+
+    // Handle specific operations
+    if (operation) {
+      switch (operation) {
+        case "add":
+          const addValue = req.query.value || "1";
+          const addUnit = req.query.unit || "day";
+          dateInfo.operation = {
+            type: "add",
+            value: addValue,
+            unit: addUnit,
+            result: now.clone().add(parseInt(addValue), addUnit).format(),
+          };
+          break;
+        case "subtract":
+          const subValue = req.query.value || "1";
+          const subUnit = req.query.unit || "day";
+          dateInfo.operation = {
+            type: "subtract",
+            value: subValue,
+            unit: subUnit,
+            result: now.clone().subtract(parseInt(subValue), subUnit).format(),
+          };
+          break;
+        case "diff":
+          const compareDate =
+            req.query.compare || now.clone().subtract(1, "day").format();
+          dateInfo.operation = {
+            type: "difference",
+            compareDate: compareDate,
+            difference: {
+              days: now.diff(moment(compareDate), "days"),
+              hours: now.diff(moment(compareDate), "hours"),
+              minutes: now.diff(moment(compareDate), "minutes"),
+              seconds: now.diff(moment(compareDate), "seconds"),
+            },
+          };
+          break;
+      }
+    }
+
+    res.json({
+      success: true,
+      message:
+        "Date and time information retrieved successfully using moment.js",
+      timestamp: now.toISOString(),
+      data: dateInfo,
+      package: "moment",
+      version: "2.30.1",
+    });
+  } catch (error) {
+    console.error("Date/Time endpoint error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to process date/time request",
+      error: error.message,
+    });
+  }
+});
+
+// Advanced date operations endpoint
+app.post("/api/v1/date-operations", (req, res) => {
+  try {
+    const { dates, operations } = req.body;
+
+    if (!dates || !Array.isArray(dates)) {
+      return res.status(400).json({
+        success: false,
+        message: "Dates array is required",
+      });
+    }
+
+    const results = dates.map((dateString, index) => {
+      const date = moment(dateString);
+
+      if (!date.isValid()) {
+        return {
+          index,
+          input: dateString,
+          error: "Invalid date format",
+        };
+      }
+
+      const result = {
+        index,
+        input: dateString,
+        parsed: date.format(),
+        isValid: date.isValid(),
+        formats: {
+          iso: date.toISOString(),
+          readable: date.format("MMMM Do YYYY, h:mm:ss a"),
+          short: date.format("MMM D, YYYY"),
+          time: date.format("HH:mm:ss"),
+        },
+        properties: {
+          dayOfWeek: date.format("dddd"),
+          dayOfYear: date.dayOfYear(),
+          weekOfYear: date.week(),
+          quarter: date.quarter(),
+          isLeapYear: date.isLeapYear(),
+          daysInMonth: date.daysInMonth(),
+        },
+      };
+
+      // Apply operations if provided
+      if (operations && operations[index]) {
+        const ops = operations[index];
+        result.operations = {};
+
+        if (ops.add) {
+          result.operations.add = date
+            .clone()
+            .add(ops.add.value, ops.add.unit)
+            .format();
+        }
+        if (ops.subtract) {
+          result.operations.subtract = date
+            .clone()
+            .subtract(ops.subtract.value, ops.subtract.unit)
+            .format();
+        }
+        if (ops.startOf) {
+          result.operations.startOf = date
+            .clone()
+            .startOf(ops.startOf)
+            .format();
+        }
+        if (ops.endOf) {
+          result.operations.endOf = date.clone().endOf(ops.endOf).format();
+        }
+      }
+
+      return result;
+    });
+
+    res.json({
+      success: true,
+      message: `Processed ${results.length} dates successfully using moment.js`,
+      results,
+      summary: {
+        totalDates: results.length,
+        validDates: results.filter((r) => r.isValid).length,
+        invalidDates: results.filter((r) => !r.isValid).length,
+        processedAt: moment().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error("Date operations error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Date operations failed",
       error: error.message,
     });
   }
