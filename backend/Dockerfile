@@ -6,6 +6,7 @@ WORKDIR /app
 
 # Install pnpm globally
 RUN npm install -g pnpm
+RUN npm install -g nodemon
 
 # Copy only dependency files first (better cache)
 COPY package.json pnpm-lock.yaml ./
